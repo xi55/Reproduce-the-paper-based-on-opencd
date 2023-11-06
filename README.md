@@ -9,6 +9,7 @@ Supported toolboxes:
 
 - [x] [OpenMMLab Toolkits](https://github.com/open-mmlab)
 - [x] [pytorch-image-models](https://github.com/rwightman/pytorch-image-models)
+- [x] [Open_CD](https://github.com/likyoo/open-cd)
 - [ ] ...
 
 Supported change detection model:
