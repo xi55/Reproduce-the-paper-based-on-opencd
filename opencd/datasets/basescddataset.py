@@ -133,6 +133,7 @@ class BaseSCDDataset(_BaseCDDataset):
         img_dir_from = self.data_prefix.get('img_path_from', None)
         img_dir_to = self.data_prefix.get('img_path_to', None)
         ann_dir = self.data_prefix.get('seg_map_path', None)
+        
         ann_dir_from = self.data_prefix.get('seg_map_path_from', None)
         ann_dir_to = self.data_prefix.get('seg_map_path_to', None)
 

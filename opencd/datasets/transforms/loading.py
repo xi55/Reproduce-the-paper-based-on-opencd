@@ -41,7 +41,7 @@ class MultiImgLoadImageFromFile(MMCV_LoadImageFromFile):
         Returns:
             dict: The dict contains loaded image and meta information.
         """
-        # print(results)
+        
         filenames = results['img_path']
         imgs = []
         try:
@@ -58,6 +58,21 @@ class MultiImgLoadImageFromFile(MMCV_LoadImageFromFile):
                 if self.to_float32:
                     img = img.astype(np.float32)
                 imgs.append(img)
+
+            if 'img_seg' in results.keys():
+                if self.file_client_args is not None:
+                    file_client = fileio.FileClient.infer_client(
+                        self.file_client_args, results['img_seg'])
+                    img_seg_bytes = file_client.get(results['img_seg'])
+                else:
+                    img_seg_bytes = fileio.get(
+                        results['img_seg'], backend_args=self.backend_args)
+                img_seg = mmcv.imfrombytes(
+                img_seg_bytes, flag=self.color_type, backend=self.imdecode_backend)
+                if self.to_float32:
+                    img_seg = img_seg.astype(np.float32)
+                results['img_seg'] = img_seg
+
         except Exception as e:
             if self.ignore_empty:
                 return None
@@ -67,6 +82,7 @@ class MultiImgLoadImageFromFile(MMCV_LoadImageFromFile):
         results['img'] = imgs
         results['img_shape'] = imgs[0].shape[:2]
         results['ori_shape'] = imgs[0].shape[:2]
+
         return results
 
 
@@ -153,9 +169,14 @@ class MultiImgLoadAnnotations(MMCV_LoadAnnotations):
         gt_semantic_seg = mmcv.imfrombytes(
             img_bytes, flag='grayscale', # in mmseg: unchanged
             backend=self.imdecode_backend).squeeze().astype(np.uint8)
-        # print(gt_semantic_seg)
-        # print(gt_semantic_seg.shape)
-        # print(np.unique(gt_semantic_seg))
+        
+        if 'img_seg_label' in results.keys():
+            seg_label = fileio.get(
+                results['img_seg_label'], backend_args=self.backend_args)
+            label_semantic_seg = mmcv.imfrombytes(
+                seg_label, flag='grayscale', # in mmseg: unchanged
+                backend=self.imdecode_backend).squeeze().astype(np.uint8)
+
         # reduce zero_label
         if self.reduce_zero_label is None:
             self.reduce_zero_label = results['reduce_zero_label']
@@ -165,7 +186,6 @@ class MultiImgLoadAnnotations(MMCV_LoadAnnotations):
             f'the `reduce_zero_label` is {self.reduce_zero_label}'
         
         if results.get('format_seg_map', None) is not None:
-            # print(np.unique(gt_semantic_seg))
             if results['format_seg_map'] == 'to_binary' and 255 in np.unique(gt_semantic_seg):
                 gt_semantic_seg_copy = gt_semantic_seg.copy()
                 gt_semantic_seg[gt_semantic_seg_copy < 128] = 0
@@ -175,13 +195,16 @@ class MultiImgLoadAnnotations(MMCV_LoadAnnotations):
             else:
                 raise ValueError('Invalid value {}'.format(results['format_seg_map']))
 
-        # print(self.reduce_zero_label)
         if self.reduce_zero_label:
-            # print(self.reduce_zero_label)
             # avoid using underflow conversion
             gt_semantic_seg[gt_semantic_seg == 0] = 255
             gt_semantic_seg = gt_semantic_seg - 1
             gt_semantic_seg[gt_semantic_seg == 254] = 255
+
+            if 'img_seg_label' in results.keys():
+                label_semantic_seg[label_semantic_seg == 0] = 255
+                label_semantic_seg = label_semantic_seg - 1
+                label_semantic_seg[label_semantic_seg == 254] = 255
         # modify to format ann
         
         # modify if custom classes
@@ -195,6 +218,10 @@ class MultiImgLoadAnnotations(MMCV_LoadAnnotations):
         
         results['gt_seg_map'] = gt_semantic_seg
         results['seg_fields'].append('gt_seg_map')
+
+        results['label_seg_map'] = label_semantic_seg
+        results['seg_fields'].append('label_seg_map')
+        
 
     def __repr__(self) -> str:
         repr_str = self.__class__.__name__

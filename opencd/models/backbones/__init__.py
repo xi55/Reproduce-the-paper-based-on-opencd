@@ -9,8 +9,9 @@ from .tinynet import TinyNet
 from .hanet import HAN
 from .fccdn import FCCDN
 from .swin_transformer_cd import SwinTransformerCD
+from .ssl_fccdn import SSL_FCCDN
 
 __all__ = ['IA_ResNetV1c', 'IA_ResNeSt', 'FC_EF', 'FC_Siam_diff', 
            'FC_Siam_conc', 'SNUNet_ECAM', 'TinyCD', 'IFN',
            'TinyNet', 'IA_MixVisionTransformer', 'HAN', 'FCCDN',
-           'SwinTransformerCD']
+           'SwinTransformerCD', 'SSL_FCCDN']

@@ -125,7 +125,10 @@ class NL_FPN(nn.Module):
         self.center = NL_FPN_Block(channel_list[0], True)
 
     def forward(self, x):
-        x[0] = self.center(x[0])
-        x[1] = self.center(x[1])
+        if(isinstance(x[0], list)):
+            x[0][0] = self.center(x[0][0])
+            x[1][0] = self.center(x[1][0])
+        else:
+            x[0] = self.center(x[0])
 
         return x

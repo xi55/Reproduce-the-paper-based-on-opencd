@@ -209,8 +209,10 @@ class DualInputSegDataPreProcessor(BaseDataPreprocessor):
         Returns:
             Dict: Data in the same format as the model input.
         """
+        # print(data.keys())
         data = self.cast_data(data)  # type: ignore
         inputs = data['inputs']
+        
         data_samples = data.get('data_samples', None)
         # TODO: whether normalize should be after stack_batch
         if self.channel_conversion and inputs[0].size(0) == 6:
@@ -219,12 +221,22 @@ class DualInputSegDataPreProcessor(BaseDataPreprocessor):
         inputs = [_input.float() for _input in inputs]
         if self._enable_normalize:
             inputs = [(_input - self.mean) / self.std for _input in inputs]
+                
+        
+        if 'inputs_seg' in data.keys():
+            inputs_seg = data['inputs_seg']
+            inputs_seg = [_inputs_seg.float() for _inputs_seg in inputs_seg]
+            if self._enable_normalize:
+                inputs_seg = [(_inputs_seg - self.mean[:3]) / self.std[:3] for _inputs_seg in inputs_seg]
+            inputs_all = [torch.concat([inputs[i], inputs_seg[i]], dim=0) for i in range(0, len(inputs))]
+        else:
+            inputs_all = inputs
 
         if training:
             assert data_samples is not None, ('During training, ',
                                               '`data_samples` must be define.')
-            inputs, data_samples = stack_batch(
-                inputs=inputs,
+            inputs_all, data_samples = stack_batch(
+                inputs=inputs_all,
                 data_samples=data_samples,
                 size=self.size,
                 size_divisor=self.size_divisor,
@@ -232,16 +244,16 @@ class DualInputSegDataPreProcessor(BaseDataPreprocessor):
                 seg_pad_val=self.seg_pad_val)
 
             if self.batch_augments is not None:
-                inputs, data_samples = self.batch_augments(
-                    inputs, data_samples)
+                inputs_all, data_samples = self.batch_augments(
+                    inputs_all, data_samples)
         else:
             assert len(inputs) == 1, (
                 'Batch inference is not support currently, '
                 'as the image size might be different in a batch')
             # pad images when testing
             if self.test_cfg:
-                inputs, padded_samples = stack_batch(
-                    inputs=inputs,
+                inputs_all, padded_samples = stack_batch(
+                    inputs=inputs_all,
                     size=self.test_cfg.get('size', None),
                     size_divisor=self.test_cfg.get('size_divisor', None),
                     pad_val=self.pad_val,
@@ -249,6 +261,6 @@ class DualInputSegDataPreProcessor(BaseDataPreprocessor):
                 for data_sample, pad_info in zip(data_samples, padded_samples):
                     data_sample.set_metainfo({**pad_info})
             else:
-                inputs = torch.stack(inputs, dim=0)
+                inputs_all = torch.stack(inputs_all, dim=0)
 
-        return dict(inputs=inputs, data_samples=data_samples)
+        return dict(inputs=inputs_all, data_samples=data_samples)

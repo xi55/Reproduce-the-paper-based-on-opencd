@@ -5,7 +5,7 @@ from mmcv.cnn import build_activation_layer, build_conv_layer, build_norm_layer
 from mmengine.model import BaseModule
 
 from opencd.models.utils.builder import ITERACTION_LAYERS
-
+from opencd.registry import MODELS
 
 @ITERACTION_LAYERS.register_module()
 class ChannelExchange(BaseModule):
@@ -101,4 +101,12 @@ class TwoIdentity(BaseModule):
 
     def forward(self, x1, x2):
         return x1, x2
+    
 
+
+
+
+
+
+
+        

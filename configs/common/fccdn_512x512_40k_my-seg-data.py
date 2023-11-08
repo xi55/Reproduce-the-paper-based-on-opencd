@@ -1,9 +1,9 @@
 _base_ = '../_base_/default_runtime.py'
 
-dataset_type = 'LEVIR_CD_Dataset'
-data_root = 'E:/LEVIR_CD_512/'
+dataset_type = 'my_seg_Dataset'
+data_root = 'E:/changeDectect/train_with_seg/'
 
-crop_size = (256, 256)
+crop_size = (512, 512)
 train_pipeline = [
     dict(type='MultiImgLoadImageFromFile'),
     dict(type='MultiImgLoadAnnotations'),
@@ -22,7 +22,7 @@ train_pipeline = [
 ]
 test_pipeline = [
     dict(type='MultiImgLoadImageFromFile'),
-    # dict(type='MultiImgResize', scale=(512, 512), keep_ratio=True),
+    dict(type='MultiImgResize', scale=(512, 512), keep_ratio=True),
     # add loading annotation after ``Resize`` because ground truth
     # does not need to do resize data transform
     dict(type='MultiImgLoadAnnotations'),
@@ -58,6 +58,8 @@ train_dataloader = dict(
             seg_map_path='train/label',
             img_path_from='train/A', 
             img_path_to='train/B',
+            img_seg='seg/train/seg_imgs',
+            img_seg_label='seg/train/seg_labels'
             ),
         pipeline=train_pipeline))
 val_dataloader = dict(
@@ -71,7 +73,10 @@ val_dataloader = dict(
         data_prefix=dict(
             seg_map_path='val/label',
             img_path_from='val/A',
-            img_path_to='val/B'),
+            img_path_to='val/B',
+            img_seg='seg/test/seg_imgs',
+            img_seg_label='seg/test/seg_labels'
+            ),
         pipeline=test_pipeline))
 test_dataloader = dict(
     batch_size=1,
@@ -82,9 +87,12 @@ test_dataloader = dict(
         type=dataset_type,
         data_root=data_root,
         data_prefix=dict(
-            seg_map_path='test/label',
-            img_path_from='test/A',
-            img_path_to='test/B'),
+            seg_map_path='val/label',
+            img_path_from='val/A',
+            img_path_to='val/B',
+            img_seg='seg/test/seg_imgs',
+            img_seg_label='seg/test/seg_labels'
+            ),
         pipeline=test_pipeline))
 
 val_evaluator = dict(type='mmseg.IoUMetric', iou_metrics=['mFscore', 'mIoU'])
@@ -110,15 +118,15 @@ param_scheduler = [
     )
 ]
 # training schedule for 40k
-train_cfg = dict(type='IterBasedTrainLoop', max_iters=40000, val_interval=4000)
+train_cfg = dict(type='IterBasedTrainLoop', max_iters=40000, val_interval=1000)
 val_cfg = dict(type='ValLoop')
 test_cfg = dict(type='TestLoop')
 default_hooks = dict(
     timer=dict(type='IterTimerHook'),
     logger=dict(type='LoggerHook', interval=50, log_metric_by_epoch=False),
     param_scheduler=dict(type='ParamSchedulerHook'),
-    checkpoint=dict(type='CheckpointHook', by_epoch=False, interval=4000,
+    checkpoint=dict(type='CheckpointHook', by_epoch=False, interval=1000,
                     save_best='mIoU'),
     sampler_seed=dict(type='DistSamplerSeedHook'),
     visualization=dict(type='CDVisualizationHook', interval=1, 
-                       img_shape=(1024, 1024, 3)))
+                       img_shape=(512, 512, 3)))

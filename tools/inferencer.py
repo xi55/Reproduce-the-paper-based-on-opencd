@@ -3,8 +3,8 @@ from typing import Union
 import cv2
 import numpy as np
 
-config_path = 'D:/git/open-cd-main/configs/FCCDN/FCCDN_512x512_40k_levircd.py'
-checkpoint_path = 'D:/git/open-cd-main/logs/cd/9/best_mIoU_iter_36000.pth'
+config_path = 'D:/git/open-cd/configs/FCCDN/FCCDN_512x512_40k_levircd.py'
+checkpoint_path = 'D:/git/open-cd/logs/fccdn/4/iter_40000.pth'
 
 # config_path = 'D:/git/open-cd-main/configs/FCCDN/FCCDN_256x256_40k_my-data.py'
 # checkpoint_path = 'D:/git/open-cd-main/logs/fccdn/3/best_mIoU_iter_33000.pth'
@@ -20,8 +20,8 @@ inferencer = OpenCDInferencer(
 img = [['E:/LEVIR_CD/test/A/test_7.png', 'E:/LEVIR_CD/test/B/test_7.png']]
 # print(type(img))
 a = inferencer(img, show=True)
-print(a)
-print(np.unique(a['predictions']))
+# print(a)
+# print(np.unique(a['predictions']))
 
 cv2.imwrite("D:/git/open-cd-main/outputs/1.png", a['predictions'] * 255)
 cv2.imwrite("D:/git/open-cd-main/outputs/seg1.png", a['i_seg1_pred'] * 255)

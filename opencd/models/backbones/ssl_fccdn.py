@@ -80,7 +80,7 @@ class BasicBlock(nn.Module):
     
 
 @MODELS.register_module()   
-class FCCDN(nn.Module):
+class SSL_FCCDN(nn.Module):
     def __init__(self, 
                  num_band, 
                  os=16, 
@@ -90,7 +90,7 @@ class FCCDN(nn.Module):
                  pool_list = [True, True, True, True],
                  channel_list = [256, 128, 64, 32],
                  **kwargs):
-        super(FCCDN, self).__init__()
+        super(SSL_FCCDN, self).__init__()
         # if os >= 16:
         #     dilation_list = [1, 1, 1, 1]
         #     stride_list = [2, 2, 2, 2]
@@ -112,24 +112,14 @@ class FCCDN(nn.Module):
         self.block4 = BasicBlock(channel_list[1], channel_list[0], pool_list[0], se_list[0], stride_list[0], dilation_list[0])
 
 
-    def forward(self, x1, x2, x3):
-        print(x1.shape(5))
-        # print(x3.shape)
-        for name, param in self.block1.named_parameters():
-            if param.requires_grad:
-                print(param.data)
-        ori = [x1, x2]
-        e1_1 = self.block1(x1)
-        e2_1 = self.block2(e1_1)
-        e3_1 = self.block3(e2_1)
-        y1 = self.block4(e3_1)
+    def forward(self, x):
+        e1 = self.block1(x)
+        e2 = self.block2(e1)
+        e3 = self.block3(e2)
+        y = self.block4(e3)
 
-        e1_2 = self.block1(x2)
-        e2_2 = self.block2(e1_2)
-        e3_2 = self.block3(e2_2)
-        y2 = self.block4(e3_2)
 
-        e1 = [e1_1, e2_1, e3_1]
-        e2 = [e1_2, e2_2, e3_2]
 
-        return [y1, y2, e1, e2, ori]
+
+
+        return [y, x, [e1, e2, e3]]

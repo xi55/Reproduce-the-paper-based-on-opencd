@@ -57,7 +57,10 @@ train_dataloader = dict(
         data_prefix=dict(
             seg_map_path='train/label',
             img_path_from='train/A', 
-            img_path_to='train/B'),
+            img_path_to='train/B',
+            img_seg='seg/train/seg_imgs',
+            img_seg_label='seg/train/seg_labels'
+            ),
         pipeline=train_pipeline))
 val_dataloader = dict(
     batch_size=1,
@@ -70,7 +73,10 @@ val_dataloader = dict(
         data_prefix=dict(
             seg_map_path='val/label',
             img_path_from='val/A',
-            img_path_to='val/B'),
+            img_path_to='val/B',
+            img_seg='seg/test/seg_imgs',
+            img_seg_label='seg/test/seg_labels'
+            ),
         pipeline=test_pipeline))
 test_dataloader = dict(
     batch_size=1,
@@ -83,7 +89,10 @@ test_dataloader = dict(
         data_prefix=dict(
             seg_map_path='val/label',
             img_path_from='val/A',
-            img_path_to='val/B'),
+            img_path_to='val/B',
+            img_seg='seg/test/seg_imgs',
+            img_seg_label='seg/test/seg_labels'
+            ),
         pipeline=test_pipeline))
 
 val_evaluator = dict(type='mmseg.IoUMetric', iou_metrics=['mFscore', 'mIoU'])

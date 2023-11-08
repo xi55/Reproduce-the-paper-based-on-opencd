@@ -13,68 +13,44 @@ from mmseg.registry import DATASETS
 
 @DATASETS.register_module()
 class _BaseCDDataset(BaseDataset):
-    """Custom datasets for change detection. An example of file structure
-    is as followed.
-    .. code-block:: none
-        ├── data
-        │   ├── my_dataset
-        │   │   ├── train
-        │   │   │   ├── img_path_from/xxx{img_suffix}
-        │   │   │   ├── img_path_to/xxx{img_suffix}
-        │   │   │   ├── seg_map_path/xxx{img_suffix}
-        │   │   ├── val
-        │   │   │   ├── img_path_from/xxx{seg_map_suffix}
-        │   │   │   ├── img_path_to/xxx{seg_map_suffix}
-        │   │   │   ├── seg_map_path/xxx{seg_map_suffix}
+    """用于变化检测的自定义数据集。文件结构示例如下所示：
+.. code-block:: none
+    ├── data
+    │   ├── my_dataset
+    │   │   ├── train
+    │   │   │   ├── img_path_from/xxx{img_suffix}
+    │   │   │   ├── img_path_to/xxx{img_suffix}
+    │   │   │   ├── seg_map_path/xxx{img_suffix}
+    │   │   ├── val
+    │   │   │   ├── img_path_from/xxx{seg_map_suffix}
+    │   │   │   ├── img_path_to/xxx{seg_map_suffix}
+    │   │   │   ├── seg_map_path/xxx{seg_map_suffix}
 
-    The imgs/gt_semantic_seg pair of CustomDataset should be of the same
-    except suffix. A valid img/gt_semantic_seg filename pair should be like
-    ``xxx{img_suffix}`` and ``xxx{seg_map_suffix}`` (extension is also included
-    in the suffix). If split is given, then ``xxx`` is specified in txt file.
-    Otherwise, all files in ``img_path_x/``and ``seg_map_path`` will be loaded.
-    Please refer to ``docs/en/tutorials/new_dataset.md`` for more details.
+CustomDataset的imgs/gt_semantic_seg成对,除了后缀之外都应该相同。有效的img/gt_semantic_seg文件名对应为``xxx{img_suffix}``和``xxx{seg_map_suffix}``
+(后缀也包括在内)。如果提供了split参数,那么``xxx``将在txt文件中指定。否则,将加载``img_path_x/``和``seg_map_path``中的所有文件。
+更多详细信息请参考``docs/en/tutorials/new_dataset.md``。
 
+参数：
+    ann_file (str): 注释文件路径。默认为空字符串。
+    metainfo (dict, 可选): 数据集的元信息,如指定要加载的类别。默认为None。
+    data_root (str, 可选): ``data_prefix``和``ann_file``的根目录。默认为None。
+    data_prefix (dict, 可选): 训练数据的前缀。默认为dict(img_path=None, seg_map_path=None)。
+    img_suffix (str): 图像的后缀。默认为'.jpg'。
+    seg_map_suffix (str): 分割地图的后缀。默认为'.png'。
+    format_seg_map (str): 如果`format_seg_map`='to_binary',二进制变化检测标签将被格式化为0(<128)或1(>=128)。默认为None。
+    filter_cfg (dict, 可选): 用于筛选数据的配置。默认为None。
+    indices (int或Sequence[int], 可选): 支持使用注释文件中的前几个数据来便于在较小的数据集上进行训练/测试。默认为None,表示使用所有``data_infos``。
+    serialize_data (bool, 可选): 是否使用序列化对象来保存内存,启用后,数据加载器工作进程可以使用主进程的共享内存,而不是制作副本。默认为True。
+    pipeline (list, 可选): 数据处理流程。默认为空列表。
+    test_mode (bool, 可选): ``test_mode=True``表示处于测试阶段。默认为False。
+    lazy_init (bool, 可选): 是否在实例化期间加载注释。在某些情况下,例如可视化,只需要数据集的元信息,无需加载注释文件。通过设置``lazy_init=True``,Basedataset可以跳过加载注释以节省时间。默认为False。
+    max_refetch (int, 可选): 如果``Basedataset.prepare_data``获取了空图像,获取有效图像的最大额外循环次数。默认为1000。
+    ignore_index (int): 要忽略的标签索引。默认为255。
+    reduce_zero_label (bool): 是否将标签零标记为忽略。默认为False。
+    backend_args (dict, 可选): 用于实例化文件后端的参数。有关详细信息,请参阅https://mmengine.readthedocs.io/en/latest/api/fileio.htm。默认为None。
+    注意:需要mmcv>=2.0.0rc4和mmengine>=0.2.0。
+"""
 
-    Args:
-        ann_file (str): Annotation file path. Defaults to ''.
-        metainfo (dict, optional): Meta information for dataset, such as
-            specify classes to load. Defaults to None.
-        data_root (str, optional): The root directory for ``data_prefix`` and
-            ``ann_file``. Defaults to None.
-        data_prefix (dict, optional): Prefix for training data. Defaults to
-            dict(img_path=None, seg_map_path=None).
-        img_suffix (str): Suffix of images. Default: '.jpg'
-        seg_map_suffix (str): Suffix of segmentation maps. Default: '.png'
-        format_seg_map (str): If `format_seg_map`='to_binary', the binary 
-            change detection label will be formatted as 0 (<128) or 1 (>=128).
-            Default: None
-        filter_cfg (dict, optional): Config for filter data. Defaults to None.
-        indices (int or Sequence[int], optional): Support using first few
-            data in annotation file to facilitate training/testing on a smaller
-            dataset. Defaults to None which means using all ``data_infos``.
-        serialize_data (bool, optional): Whether to hold memory using
-            serialized objects, when enabled, data loader workers can use
-            shared RAM from master process instead of making a copy. Defaults
-            to True.
-        pipeline (list, optional): Processing pipeline. Defaults to [].
-        test_mode (bool, optional): ``test_mode=True`` means in test phase.
-            Defaults to False.
-        lazy_init (bool, optional): Whether to load annotation during
-            instantiation. In some cases, such as visualization, only the meta
-            information of the dataset is needed, which is not necessary to
-            load annotation file. ``Basedataset`` can skip load annotations to
-            save time by set ``lazy_init=True``. Defaults to False.
-        max_refetch (int, optional): If ``Basedataset.prepare_data`` get a
-            None img. The maximum extra number of cycles to get a valid
-            image. Defaults to 1000.
-        ignore_index (int): The label index to be ignored. Default: 255
-        reduce_zero_label (bool): Whether to mark label zero as ignored.
-            Default to False.
-        backend_args (dict, Optional): Arguments to instantiate a file backend.
-            See https://mmengine.readthedocs.io/en/latest/api/fileio.htm
-            for details. Defaults to None.
-            Notes: mmcv>=2.0.0rc4, mmengine>=0.2.0 required.
-    """
     METAINFO: dict = dict()
 
     def __init__(self,
@@ -232,11 +208,15 @@ class _BaseCDDataset(BaseDataset):
             list[dict]: All data info of dataset.
         """
         data_list = []
+
         img_dir_from = self.data_prefix.get('img_path_from', None)
         img_dir_to = self.data_prefix.get('img_path_to', None)
+        img_seg = self.data_prefix.get("img_seg", None)
+        img_seg_label = self.data_prefix.get("img_seg_label", None)
         ann_dir = self.data_prefix.get('seg_map_path', None)
 
         if osp.isfile(self.ann_file):
+
             lines = mmengine.list_from_file(
                 self.ann_file, backend_args=self.backend_args)
             for line in lines:
@@ -253,6 +233,7 @@ class _BaseCDDataset(BaseDataset):
                 data_info['seg_fields'] = []
                 data_list.append(data_info)
         else:
+
             file_list_from = fileio.list_dir_or_file(
                     dir_path=img_dir_from,
                     list_dir=False,
@@ -282,6 +263,9 @@ class _BaseCDDataset(BaseDataset):
                 if ann_dir is not None:
                     seg_map = img.replace(self.img_suffix, self.seg_map_suffix)
                     data_info['seg_map_path'] = osp.join(ann_dir, seg_map)
+                if img_seg is not None:
+                    data_info['img_seg'] = osp.join(img_seg, img)
+                    data_info['img_seg_label'] = osp.join(img_seg_label, seg_map)
                 data_info['label_map'] = self.label_map
                 data_info['format_seg_map'] = self.format_seg_map
                 data_info['reduce_zero_label'] = self.reduce_zero_label

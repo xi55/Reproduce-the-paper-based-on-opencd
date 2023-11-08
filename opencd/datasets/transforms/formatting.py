@@ -42,7 +42,7 @@ class MultiImgPackSegInputs(BaseTransform):
 
     def __init__(self,
                  meta_keys=('img_path', 'seg_map_path', 'seg_map_path_from', 
-                            'seg_map_path_to', 'ori_shape','img_shape', 
+                            'seg_map_path_to', 'img_seg', 'img_seg_label', 'ori_shape','img_shape', 
                             'pad_shape', 'scale_factor', 'flip',
                             'flip_direction')):
         self.meta_keys = meta_keys
@@ -76,13 +76,26 @@ class MultiImgPackSegInputs(BaseTransform):
             imgs = torch.cat(imgs, axis=0) # -> (6, H, W)
             packed_results['inputs'] = imgs
 
+        if 'img_seg' in results:
+            def _transform_img(img):
+                if len(img.shape) < 3:
+                    img = np.expand_dims(img, -1)
+                if not img.flags.c_contiguous:
+                    img = to_tensor(np.ascontiguousarray(img.transpose(2, 0, 1)))
+                else:
+                    img = img.transpose(2, 0, 1)
+                    img = to_tensor(img).contiguous()
+                return img
+            img_seg = _transform_img(results['img_seg'])
+            packed_results['inputs_seg'] = img_seg
+
         data_sample = SegDataSample()
         if 'gt_seg_map' in results:
             gt_sem_seg_data = dict(
                 data=to_tensor(results['gt_seg_map'][None,
                                                      ...].astype(np.int64)))
             data_sample.gt_sem_seg = PixelData(**gt_sem_seg_data)
-
+        
         if 'gt_edge_map' in results:
             gt_edge_data = dict(
                 data=to_tensor(results['gt_edge_map'][None,
@@ -101,13 +114,19 @@ class MultiImgPackSegInputs(BaseTransform):
                                                      ...].astype(np.int64)))
             data_sample.set_data(dict(gt_sem_seg_to=PixelData(**gt_sem_seg_data_to)))
 
+        if 'label_seg_map' in results:
+            gt_sem_seg = dict(
+                data=to_tensor(results['label_seg_map'][None,
+                                                     ...].astype(np.int64)))
+            data_sample.set_data(dict(label_seg_map=PixelData(**gt_sem_seg)))
+
         img_meta = {}
         for key in self.meta_keys:
             if key in results:
                 img_meta[key] = results[key]
         data_sample.set_metainfo(img_meta)
         packed_results['data_samples'] = data_sample
-
+        
         return packed_results
 
     def __repr__(self) -> str:

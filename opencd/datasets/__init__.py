@@ -10,7 +10,9 @@ from .s2looking import S2Looking_Dataset
 from .second import SECOND_Dataset
 from .svcd import SVCD_Dataset
 from .my_data import my_Dataset
+from .my_seg_data import my_seg_Dataset
 
 __all__ = ['_BaseCDDataset', 'BaseSCDDataset', 'LEVIR_CD_Dataset', 'S2Looking_Dataset', 
            'SVCD_Dataset', 'RSIPAC_CD_Dataset', 'CLCD_Dataset', 'DSIFN_Dataset', 
-           'SECOND_Dataset', 'Landsat_Dataset', 'BANDON_Dataset', 'my_Dataset']
+           'SECOND_Dataset', 'Landsat_Dataset', 'BANDON_Dataset', 'my_Dataset',
+           'my_seg_Dataset']

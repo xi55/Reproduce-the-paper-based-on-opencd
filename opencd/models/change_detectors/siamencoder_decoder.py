@@ -77,6 +77,7 @@ class SiamEncoderDecoder(BaseSegmentor):
     def __init__(self,
                  backbone: ConfigType,
                  decode_head: ConfigType,
+                 cd_decode_head: OptConfigType = None,
                  neck: OptConfigType = None,
                  auxiliary_head: OptConfigType = None,
                  train_cfg: OptConfigType = None,
@@ -95,6 +96,7 @@ class SiamEncoderDecoder(BaseSegmentor):
         if neck is not None:
             self.neck = MODELS.build(neck)
         self._init_decode_head(decode_head)
+        self._init_cd_decode_head(cd_decode_head)
         self._init_auxiliary_head(auxiliary_head)
 
         self.train_cfg = train_cfg
@@ -109,6 +111,10 @@ class SiamEncoderDecoder(BaseSegmentor):
         self.align_corners = self.decode_head.align_corners
         self.num_classes = self.decode_head.num_classes
         self.out_channels = self.decode_head.out_channels
+    
+    def _init_cd_decode_head(self, cd_decode_head:ConfigType) -> None:
+        if cd_decode_head is not None:
+            self.cd_decode_head = MODELS.build(cd_decode_head)
 
     def _init_auxiliary_head(self, auxiliary_head: ConfigType) -> None:
         """Initialize ``auxiliary_head``"""
@@ -152,6 +158,17 @@ class SiamEncoderDecoder(BaseSegmentor):
                                             self.train_cfg)
 
         losses.update(add_prefix(loss_decode, 'decode'))
+        return losses
+    
+    def _cd_decode_head_forward_train(self, inputs: List[Tensor],
+                                   data_samples: SampleList) -> dict:
+        """Run forward function and calculate loss for decode head in
+        training."""
+        losses = dict()
+        loss_decode = self.cd_decode_head.loss(inputs, data_samples,
+                                            self.train_cfg)
+
+        losses.update(add_prefix(loss_decode, 'cd_decode'))
         return losses
 
     def _auxiliary_head_forward_train(self, inputs: List[Tensor],

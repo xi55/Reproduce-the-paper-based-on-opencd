@@ -1,10 +1,10 @@
 _base_ = [
     '../_base_/models/fccdn_se.py', 
-    '../common/standard_512x512_40k_my-data.py']
+    '../common/fccdn_512x512_40k_my-data.py']
 
 checkpoint = None
 
-model = dict(pretrained=checkpoint, decode_head=dict(num_classes=2))
+model = dict(type='DIEncoderDecoder', pretrained=checkpoint, decode_head=dict(num_classes=2))
 
 # optimizer
 optimizer=dict(
