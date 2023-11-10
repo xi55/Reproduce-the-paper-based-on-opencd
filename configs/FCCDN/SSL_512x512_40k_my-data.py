@@ -16,8 +16,8 @@ model = dict(type='SDIEncoderDecoder',
                pool_list = [True, True, True, True],
                channel_list = [256, 128, 64, 32],
             ),
-            decode_head=dict(
-                type='SSL_Head',
+            cd_decode_head=dict(
+                type='SSL_CD_Head',
                 in_channels = 3,
                 channels=32,
                 num_classes=9,
@@ -26,18 +26,7 @@ model = dict(type='SDIEncoderDecoder',
                 norm_cfg=norm_cfg,
                 align_corners=False,
                 loss_decode=dict(
-                    type='mmseg.CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)),
-            cd_decode_head=dict(
-                type='SSL_CD_Head',
-                in_channels = 3,
-                channels=32,
-                num_classes=2,
-                channel_list = [256, 128, 64, 32],
-                pool_list = [True, True, True, True],
-                norm_cfg=norm_cfg,
-                align_corners=False,
-                loss_decode=dict(
-                    type='FCCDN_loss_BCD', loss_name='fccdn_loss', loss_weight=1.0))
+                    type='mmseg.CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0))
             )
 
 # optimizer

@@ -165,10 +165,10 @@ class SiamEncoderDecoder(BaseSegmentor):
         """Run forward function and calculate loss for decode head in
         training."""
         losses = dict()
-        loss_decode = self.cd_decode_head.loss(inputs, data_samples,
+        loss_cd = self.cd_decode_head.loss(inputs, data_samples,
                                             self.train_cfg)
 
-        losses.update(add_prefix(loss_decode, 'cd_decode'))
+        losses.update(add_prefix(loss_cd, 'cd_decode'))
         return losses
 
     def _auxiliary_head_forward_train(self, inputs: List[Tensor],

@@ -231,7 +231,6 @@ class DualInputSegDataPreProcessor(BaseDataPreprocessor):
             inputs_all = [torch.concat([inputs[i], inputs_seg[i]], dim=0) for i in range(0, len(inputs))]
         else:
             inputs_all = inputs
-
         if training:
             assert data_samples is not None, ('During training, ',
                                               '`data_samples` must be define.')

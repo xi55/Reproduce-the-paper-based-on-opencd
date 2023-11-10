@@ -17,7 +17,6 @@ class SDIEncoderDecoder(SiamEncoderDecoder):
     Note that auxiliary_head is only used for deep supervision during training,
     which could be dumped during inference.
     """
-    ## TODO:加一个CD_decoder
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ema = EMA(self.backbone, 0.99)
@@ -31,8 +30,9 @@ class SDIEncoderDecoder(SiamEncoderDecoder):
         # feat_to = self.backbone(img_to)
         feat_seg = self.backbone(img_seg)
         self.ema.update()
-        feat_from = self.backbone(img_from)
-        feat_to = self.backbone(img_to)
+        with torch.no_grad():
+            feat_from = self.backbone(img_from)
+            feat_to = self.backbone(img_to)
         self.ema.restore()
 
         
@@ -40,9 +40,18 @@ class SDIEncoderDecoder(SiamEncoderDecoder):
         if self.with_neck:
             x = self.neck([feat_from, feat_to])
             x_seg = self.neck(feat_seg)
-
-        return x, x_seg
+        x.append(x_seg)
+        return x
     
+    def encode_decode(self, inputs: Tensor,
+                      batch_img_metas: List[dict]) -> Tensor:
+        """Encode images with backbone and decode into a semantic segmentation
+        map of the same size as input."""
+        x = self.extract_feat(inputs)
+        seg_logits = self.cd_decode_head.predict(x, batch_img_metas,
+                                              self.test_cfg)
+
+        return seg_logits
 
     
     def loss(self, inputs: Tensor, data_samples: SampleList) -> dict:
@@ -58,28 +67,15 @@ class SDIEncoderDecoder(SiamEncoderDecoder):
                 dict[str, Tensor]: a dictionary of loss components
             """
 
-            x, x_seg = self.extract_feat(inputs)
-
+            x = self.extract_feat(inputs)
+            # x.append(x_seg)
+            # print(len(x))
             losses = dict()
-            loss_decode = self._decode_head_forward_train(x_seg, data_samples)
+            loss_decode = self._cd_decode_head_forward_train(x, data_samples)
             losses.update(loss_decode)
-
-            self.ema.update()
-
-            loss_t1 = self._decode_head_forward_train(x[0], data_samples)
-            loss_t2 = self._decode_head_forward_train(x[1], data_samples)
-            losses.update(loss_t1 + loss_t2)
-
-            if self.with_cd_head:
-                loss_cd_decode = self._cd_decode_head_forward_train(x, data_samples)
-                losses.update(loss_cd_decode)
-
-            self.ema.restore()
-
             
-
             if self.with_auxiliary_head:
-                loss_aux = self._auxiliary_head_forward_train(x_seg, data_samples)
+                loss_aux = self._auxiliary_head_forward_train(x, data_samples)
                 losses.update(loss_aux)
 
             return losses

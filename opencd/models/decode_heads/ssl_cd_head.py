@@ -12,6 +12,7 @@ from mmseg.utils import ConfigType, SampleList
 from typing import List, Tuple
 from mmseg.models.losses import accuracy
 from mmseg.models.utils import resize
+import matplotlib.pyplot as plt
 
 bn_mom = 0.0003
 class densecat_cat_add(nn.Module):
@@ -157,40 +158,46 @@ class SSL_CD_Head(MyBaseDecodeHead):
                         nn.UpsamplingBilinear2d(scale_factor=2)
                         )
         self.conv_out = torch.nn.Conv2d(8,1,kernel_size=3,stride=1,padding=1)
-        self.conv_out_class = torch.nn.Conv2d(channel_list[3],1, kernel_size=1,stride=1,padding=0)
+        self.conv_out_class = torch.nn.Conv2d(channel_list[3],self.out_channels, kernel_size=1,stride=1,padding=0)
 
 
 
     def forward(self, x):
-        y, ori, e = x
-        print(y.shape)
-        c = self.df4(x[0], x[1])
+        x1, x2, x_seg = x[0][0], x[1][0], x[2][0]
+        ori1, ori2, ori = x[0][1], x[1][1], x[2][1]
+        e1, e2, e = x[0][2], x[1][2], x[2][2]
 
+        ## student
+        x_seg = self.decoder3(x_seg, e[2])
+        x_seg = self.decoder2(x_seg, e[1])
+        x_seg = self.decoder1(x_seg, e[0])
+        x_seg = self.cls_seg(x_seg)
 
-        # aff = self.affinity_map(x[0], x[1], c)
+        ## teacher
+        c = self.df4(x1, x2)
 
-        x[0] = self.decoder3(x[0], x[2][2])
-        x[1] = self.decoder3(x[1], x[3][2])
+        x1 = self.decoder3(x1, e1[2])
+        x2 = self.decoder3(x2, e2[2])
         
-        c = self.catc3(c, self.df3(x[0], x[1]))
+        c = self.catc3(c, self.df3(x1, x2))
 
 
-        x[0] = self.decoder2(x[0], x[2][1])
-        x[1] = self.decoder2(x[1], x[3][1])
-        c = self.catc2(c, self.df2(x[0], x[1]))
+        x1= self.decoder2(x1, e1[1])
+        x2 = self.decoder2(x2, e2[1])
+        c = self.catc2(c, self.df2(x1, x2))
 
 
-        x[0] = self.decoder1(x[0], x[2][0])
-        x[1] = self.decoder1(x[1], x[3][0])
-        c = self.catc1(c, self.df1(x[0], x[1]))
+        x1 = self.decoder1(x1, e1[0])
+        x2 = self.decoder1(x2, e2[0])
+        c = self.catc1(c, self.df1(x1, x2))
 
 
-        x[0] = self.conv_out_class(x[0])
-        x[1] = self.conv_out_class(x[1])
+        x1 = self.cls_seg(x1)
+        x2 = self.cls_seg(x2)
         y = self.conv_out(self.upsample_x2(c))
         
 
-        return y
+        return [y, x1, x2, x_seg]
     
     def affinity_map(self, t1: Tensor, t2:Tensor, v:Tensor):
         B, C, H, W = t1.shape
@@ -213,60 +220,87 @@ class SSL_CD_Head(MyBaseDecodeHead):
 
         return aff_map
     
-    def loss(self, inputs: Tuple[Tensor], batch_data_samples: SampleList,
-             train_cfg: ConfigType) -> dict:
-        seg_logits = self.forward(inputs)
 
-        losses = self.loss_by_feat(seg_logits, batch_data_samples)
-        return losses
-    
+    def _stack_batch_gt(self, batch_data_samples: SampleList) -> Tensor:
+        label_semantic_segs = [
+            data_sample.label_seg_map.data for data_sample in batch_data_samples
+        ]
+        return torch.stack(label_semantic_segs, dim=0)
+
+    def display1(self, affinity):
+        affinity = affinity.unsqueeze(2)
+        affinity = affinity.cpu().numpy()
+        plt.imshow(affinity)
+        plt.colorbar()
+        plt.show()
+
     def loss_by_feat(self, seg_logits: Tensor,
                      batch_data_samples: SampleList) -> dict:
         
-        seg_logits, seg1, seg2, z, ori = seg_logits
+        cd_pred, seg1_pred, seg2_pred, seg_pred = seg_logits
         seg_label = self._stack_batch_gt(batch_data_samples)
-        
+        # print(torch.unique(seg_label))
         loss = dict()
 
-        label_size = seg_label.shape[2:]
-        
-        label_sized2x = (label_size[0]//2, label_size[1]//2)
+        seg1_pred = torch.sigmoid(seg1_pred)
+        seg2_pred = torch.sigmoid(seg2_pred)
 
-        seg_logits = resize(
-            input=seg_logits,
-            size=label_size,
+        seg1_pred[seg1_pred > 0.5] == 1
+        seg1_pred[seg1_pred <= 0.5] == 0
+
+        seg2_pred[seg2_pred > 0.5] == 1
+        seg2_pred[seg2_pred <= 0.5] == 0
+        # pseudo_label =  
+
+        # print(seg1_pred.shape)
+        # print(seg2_pred.shape)
+        seg_label_size = seg_label.shape[2:]
+
+        seg_pred = resize(
+            input=seg_pred,
+            size=seg_label_size,
             mode='bilinear',
             align_corners=self.align_corners)
-        
-        max_pooling_layer = nn.MaxPool2d(kernel_size=2, stride=2)
-        seg_label_down2x = max_pooling_layer(seg_label.float())
+
 
         if self.sampler is not None:
             seg_weight = self.sampler.sample(seg_logits, seg_label)
         else:
             seg_weight = None
-        if not isinstance(self.loss_decode, nn.ModuleList):
-            losses_decode = [self.loss_decode]
-        else:
-            losses_decode = self.loss_decode
-
-        seg_logits = [seg_logits, seg1, seg2]
-        for loss_decode in losses_decode:
-            if loss_decode.loss_name not in loss:
-                loss[loss_decode.loss_name] = loss_decode(
-                    seg_logits,
-                    [seg_label.float(),seg_label_down2x.float()],
-                    weight=seg_weight,
-                    ignore_index=self.ignore_index)
-            else:
-                loss[loss_decode.loss_name] += loss_decode(
-                    seg_logits,
-                    seg_label,
-                    weight=seg_weight,
-                    ignore_index=self.ignore_index)
-
         seg_label = seg_label.squeeze(1)
+
+        # self.display1(seg_label[0])
+
+        loss['loss_seg'] = self.loss_decode(
+                    seg_pred,
+                    seg_label.long(),
+                    weight=seg_weight,
+                    ignore_index=self.ignore_index)
+
+        # seg_label = seg_label.squeeze(1)
         loss['acc_seg'] = accuracy(
-            seg_logits[0], seg_label, ignore_index=self.ignore_index)
+            seg_pred, seg_label, ignore_index=self.ignore_index)
         return loss
+    
+
+    def predict_by_feat(self, seg_logits: Tensor,
+                        batch_img_metas: List[dict]) -> Tensor:
+        """Transform a batch of output seg_logits to the input shape.
+
+        Args:
+            seg_logits (Tensor): The output from decode head forward function.
+            batch_img_metas (list[dict]): Meta information of each image, e.g.,
+                image size, scaling factor, etc.
+
+        Returns:
+            Tensor: Outputs segmentation logits map.
+        """
+        cd_pred, seg1_pred, seg2_pred, seg_pred = seg_logits
+        seg_logits = resize(
+                input=seg_pred,
+                size=batch_img_metas[0]['img_shape'],
+                mode='bilinear',
+                align_corners=self.align_corners)
+        return seg_logits
+        
 
