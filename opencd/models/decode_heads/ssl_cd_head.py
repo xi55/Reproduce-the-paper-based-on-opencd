@@ -150,6 +150,13 @@ class SSL_CD_Head(MyBaseDecodeHead):
         self.catc3=cat(channel_list[0],channel_list[1], channel_list[1], upsample=pool_list[0])
         self.catc2=cat(channel_list[1],channel_list[2], channel_list[2], upsample=pool_list[1])
         self.catc1=cat(channel_list[2],channel_list[3], channel_list[3], upsample=pool_list[2])
+        
+        self.upsample_x1=nn.Sequential(
+                        nn.Conv2d(channel_list[3],channel_list[3],kernel_size=3, stride=1, padding=1),
+                        torch.nn.BatchNorm2d(channel_list[3], momentum=bn_mom),
+                        nn.ReLU(inplace=True),
+                        nn.UpsamplingBilinear2d(scale_factor=2)
+                        )
 
         self.upsample_x2=nn.Sequential(
                         nn.Conv2d(channel_list[3],8,kernel_size=3, stride=1, padding=1),
@@ -171,7 +178,9 @@ class SSL_CD_Head(MyBaseDecodeHead):
         x_seg = self.decoder3(x_seg, e[2])
         x_seg = self.decoder2(x_seg, e[1])
         x_seg = self.decoder1(x_seg, e[0])
-        x_seg = self.cls_seg(x_seg)
+        
+        # print(ori.shape)
+        x_seg = self.cls_seg(self.upsample_x1(x_seg))
 
         ## teacher
         c = self.df4(x1, x2)
@@ -199,38 +208,17 @@ class SSL_CD_Head(MyBaseDecodeHead):
 
         return [y, x1, x2, x_seg]
     
-    def affinity_map(self, t1: Tensor, t2:Tensor, v:Tensor):
-        B, C, H, W = t1.shape
-        t1 = self.conv(t1)
-        t2 = self.conv(t2)
-        t1 = t1.view(B, C, -1).permute(0, 2, 1) # (B, 1024, 256)
-        t2 = t2.view(B, C, -1).permute(0, 2, 1) # (B, 1024, 256)
-        v = v.view(B, C, -1) # (B, 256, 1024)
-
-        affinity1 = (C**-.5) * (t1 @ t1.permute(0, 2, 1))
-        affinity1 = torch.sigmoid(affinity1) # (B, 1024, 1024)
-        aff_map1 = (v @ affinity1).view(B, C, H, W)
-
-        affinity2 = (C**-.5) * (t2 @ t2.permute(0, 2, 1))
-        affinity2 = torch.sigmoid(affinity2)
-        aff_map2 = (v @ affinity2).view(B, C, H, W)
-
-        aff_map = aff_map2 - aff_map1
-        aff_map = self.conv(aff_map)
-
-        return aff_map
-    
-
     def _stack_batch_gt(self, batch_data_samples: SampleList) -> Tensor:
         label_semantic_segs = [
             data_sample.label_seg_map.data for data_sample in batch_data_samples
         ]
         return torch.stack(label_semantic_segs, dim=0)
 
-    def display1(self, affinity):
+    def display1(self, affinity, s):
         affinity = affinity.unsqueeze(2)
         affinity = affinity.cpu().numpy()
         plt.imshow(affinity)
+        plt.title(s)
         plt.colorbar()
         plt.show()
 
@@ -241,7 +229,8 @@ class SSL_CD_Head(MyBaseDecodeHead):
         seg_label = self._stack_batch_gt(batch_data_samples)
         # print(torch.unique(seg_label))
         loss = dict()
-
+        # print(seg_pred.shape)
+        # print(seg_label.shape)
         seg1_pred = torch.sigmoid(seg1_pred)
         seg2_pred = torch.sigmoid(seg2_pred)
 
@@ -261,15 +250,16 @@ class SSL_CD_Head(MyBaseDecodeHead):
             size=seg_label_size,
             mode='bilinear',
             align_corners=self.align_corners)
-
-
+        
         if self.sampler is not None:
             seg_weight = self.sampler.sample(seg_logits, seg_label)
         else:
             seg_weight = None
         seg_label = seg_label.squeeze(1)
 
-        # self.display1(seg_label[0])
+        # vis = seg_label[0]
+        # vis[vis == 255.0] == 9
+        # self.display1(vis, batch_data_samples[0].seg_map_path.split('\\')[-1])
 
         loss['loss_seg'] = self.loss_decode(
                     seg_pred,

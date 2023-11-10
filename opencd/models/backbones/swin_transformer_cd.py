@@ -770,3 +770,28 @@ class SwinTransformerCD(BaseModule):
         y2 = outs2.pop(-1)
         
         return [y1, y2, outs1, outs2, ori]
+    
+    def forward(self, x):
+        ori = x
+        x, hw_shape = self.patch_embed(x)
+        # print(x.shape)
+        if self.use_abs_pos_embed:
+            x = x + self.absolute_pos_embed
+        x = self.drop_after_pos(x)
+
+        outs = []
+        for i, stage in enumerate(self.stages):
+            x, hw_shape, out, out_hw_shape = stage(x, hw_shape)
+            if i in self.out_indices:
+                norm_layer = getattr(self, f'norm{i}')
+                out = norm_layer(out)
+                out = out.view(-1, *out_hw_shape,
+                               self.num_features[i]).permute(0, 3, 1,
+                                                             2).contiguous()
+                outs.append(out)
+        
+
+
+        y = outs.pop(-1)
+        
+        return [y, ori, outs]

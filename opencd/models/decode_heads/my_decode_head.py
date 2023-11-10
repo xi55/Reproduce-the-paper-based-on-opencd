@@ -170,6 +170,7 @@ class MyBaseDecodeHead(BaseDecodeHead, metaclass=ABCMeta):
         """Classify each pixel."""
         if self.dropout is not None:
             feat = self.dropout(feat)
+        # print(feat.shape)
         output = self.conv_seg(feat)
         return output
 
